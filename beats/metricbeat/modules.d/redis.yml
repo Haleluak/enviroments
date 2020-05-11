@@ -1,0 +1,5 @@
+- module: redis
+  enabled: true
+  metricsets: ["info", "keyspace"]
+  period: 10s
+  hosts: ["redis:6379"]

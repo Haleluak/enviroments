@@ -1,0 +1,30 @@
+FROM elasticsearch:5.6.5
+
+MAINTAINER Dev <dev@local.vn>
+
+RUN mkdir /etc/sysctl.d
+
+RUN echo "* - nofile 65535" >> /etc/security/limits.conf && \
+    echo "* - memlock unlimited" >> /etc/security/limits.conf && \
+    echo vm.max_map_count=262144 > /etc/sysctl.d/max_map_count.conf && \
+    echo vm.swappiness=0 > /etc/sysctl.d/swappiness.conf
+
+ENV ES_JAVA_OPTS="-Xms1g -Xmx1g"
+ENV MAX_OPEN_FILES=65535
+ENV MAX_LOCKED_MEMORY=unlimited
+
+# ADD ./plugins/elasticsearch-analysis-icu-2.7.0.zip /tmp/elasticsearch-analysis-icu-2.7.0.zip
+ADD ./plugins/analysis-icu-5.6.3.zip /tmp/analysis-icu-5.6.3.zip
+RUN bin/elasticsearch-plugin install analysis-icu
+
+ADD ./plugins/elasticsearch-analysis-vietnamese-5.6.5.zip /tmp/elasticsearch-analysis-vietnamese-5.6.5.zip
+RUN bin/elasticsearch-plugin install file:///tmp/elasticsearch-analysis-vietnamese-5.6.5.zip
+
+# RUN bin/elasticsearch-plugin install royrusso/elasticsearch-HQ/v1.0.0
+# RUN bin/elasticsearch-plugin install -b x-pack
+
+RUN cp /usr/share/zoneinfo/Asia/Ho_Chi_Minh /etc/localtime
+
+EXPOSE 9200 9300
+
+CMD ["elasticsearch"]

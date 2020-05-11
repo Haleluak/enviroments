@@ -1,0 +1,7 @@
+- module: mariadb
+  enabled: true
+  metricsets: ["status"]
+  period: 10s
+  hosts: ["tcp(mariadb:3306)/"]
+  username: root
+  password: oVXEkVi9FTgYdhif

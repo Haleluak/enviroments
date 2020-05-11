@@ -1,0 +1,95 @@
+version: '2'
+services:
+  nginx:
+    image: nginx:latest
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./html:/var/www/html
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./nginx/logs:/var/log/nginx
+    links:
+      - php7
+    networks:
+      - customize
+
+  php7:
+    build:
+      context: ./php7
+    volumes:
+      - ./html:/var/www/html
+      - ./php7/supervisor/conf.d:/etc/supervisor/conf.d
+      - ./php7/supervisor/logs:/var/log/supervisor
+    ports:
+      - "9001:9001"
+      - "8081:8081"
+    environment:
+      - XDEBUG_CONFIG=remote_host=172.17.0.1
+    depends_on:
+      - mariadb
+      - redis
+      - mongodb
+    working_dir: /var/www/html
+    networks:
+      - customize
+
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:4.7
+    ports:
+      - "38080:80"
+    environment:
+      - PMA_HOST=mariadb
+    networks:
+      - customize
+
+  mariadb:
+    image: mariadb:latest
+    volumes:
+      - /hdd/data/mariadb:/var/lib/mysql
+      - ./mariadb/conf/my.cnf:/etc/mysql/my.cnf
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456@
+    networks:
+      - customize
+
+  mongodb:
+    image: mongo:latest
+    environment:
+      - MONGO_DATA_DIR=/data/db
+      - MONGO_LOG_DIR=/dev/null
+    volumes:
+      - ./mongodb/db:/data/data
+    ports:
+        - 27017:27017
+    networks:
+      - customize
+
+  mongoexpress:
+    image: mongo-express:0.49
+    ports:
+      - "38081:8081"
+    environment:
+      - ME_CONFIG_MONGODB_SERVER=mongodb
+    networks:
+      - customize
+
+  redis:
+    image: redis:latest
+    volumes:
+    - ./redis/data:/data
+    ports:
+    - "6379:6379"
+    networks:
+    - customize
+networks:
+  customize:
+    driver: bridge
+    driver_opts:
+      com.docker.network.enable_ipv4: "true"
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.0.0.0/8

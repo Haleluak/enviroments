@@ -1,0 +1,25 @@
+version: '3.3'
+
+services:
+  jenkins:
+    build:
+      context: ./jenkins
+    ports:
+      - "50000:50000"
+      - "8888:8080"
+    volumes:
+      - ./jenkins/home:/var/jenkins_home
+    environment:
+      JAVA_OPTS: -Djenkins.install.runSetupWizard=false
+    networks:
+      - customize
+
+networks:
+  customize:
+    driver: bridge
+    driver_opts:
+      com.docker.network.enable_ipv4: "true"
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.0.0.0/8

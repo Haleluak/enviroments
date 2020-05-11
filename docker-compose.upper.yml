@@ -1,0 +1,86 @@
+version: '3'
+
+services:
+  nginx:
+    image: nginx:latest
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./html:/var/www/html
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./nginx/logs:/var/log/nginx
+    links:
+      - php72
+    networks:
+      - customize
+
+  php72:
+    build: php72
+    volumes:
+      - ./html:/var/www/html
+      - ./supervisor/conf.d:/etc/supervisor/conf.d
+      - ./supervisor/logs:/var/log/supervisor
+    ports:
+      - "9000:9000"
+    depends_on:
+      - mariadb
+      - redis
+      - elastic
+      - rabbitmq
+    working_dir: /var/www/html
+    networks:
+      - customize
+
+  mariadb:
+    image: mariadb:latest
+    volumes:
+      - /hdd/data/mariadb:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456@
+    networks:
+      - customize
+
+  redis:
+    image: redis:latest
+    volumes:
+      - ./redis/data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - customize
+
+  elastic:
+    build:
+      context: ./elastic
+    image: viktor68/zyz_es:1.0.0
+    volumes:
+      - ./elastic/logs:/var/log/elasticsearch
+      - ./elastic/data:/var/lib/elasticsearch
+    ports:
+      - "9200:9200"
+    networks:
+      - customize
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "15672:15672"
+      - "5672:5672"
+    networks:
+      - customize
+
+networks:
+  customize:
+    driver: bridge
+    driver_opts:
+      com.docker.network.enable_ipv4: "true"
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.0.0.0/8

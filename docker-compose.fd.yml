@@ -1,0 +1,70 @@
+version: '3'
+
+services:
+  nginx:
+    image: nginx:latest
+    ports:
+    - "80:80"
+    - "443:443"
+    volumes:
+    - ./html:/var/www/html
+    - ./nginx/conf.d:/etc/nginx/conf.d
+    - ./nginx/logs:/var/log/nginx
+    links:
+    - php7
+    networks:
+    - customize
+
+  php7:
+    build:
+      context: ./php7
+    image: khanhnv/php7:latest
+    volumes:
+    - ./html:/var/www/html
+    - ./php7/supervisor/conf.d:/etc/supervisor/conf.d
+    - ./php7/supervisor/logs:/var/log/supervisor
+    ports:
+    - "9001:9001"
+    - "8081:8081"
+    - "4200:4200"
+    - "9876:9876"
+    depends_on:
+    - mariadb
+    - redis
+    extra_hosts:
+    - "mail.tuoitre.com.vn:192.168.161.170"
+    - "api.tuoitre.vn:192.168.60.174"
+    working_dir: /var/www/html
+    networks:
+    - customize
+
+  mariadb:
+    image: mariadb:latest
+    volumes:
+    - /hdd/data/mariadb:/var/lib/mysql
+    - ./mariadb/conf/my.cnf:/etc/mysql/my.cnf
+    ports:
+    - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: 123456@
+    networks:
+    - customize
+
+  redis:
+    image: redis:latest
+    volumes:
+    - ./redis/data:/data
+    ports:
+    - "6379:6379"
+    networks:
+    - customize
+
+networks:
+  customize:
+    driver: bridge
+    driver_opts:
+      com.docker.network.enable_ipv4: "true"
+    ipam:
+      driver: default
+      config:
+      - subnet: 10.0.0.0/8

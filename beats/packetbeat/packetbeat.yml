@@ -1,0 +1,52 @@
+# Network devide
+packetbeat.interfaces.device: any
+packetbeat.interfaces.snaplen: 1514
+packetbeat.interfaces.type: af_packet
+packetbeat.interfaces.buffer_size_mb: 100
+
+packetbeat.flows:
+  enabled: true
+  timeout: 30s
+  period: 10s
+
+packetbeat.protocols:
+
+- type: icmp
+  enabled: true
+
+- type: dns
+  ports: [53]
+
+- type: amqp
+  ports: [5672]
+  max_body_length: 1000
+  parse_headers: true
+  parse_arguments: false
+  hide_connection_information: true
+
+- type: redis
+  ports: [6379]
+
+# Monitor any traffic to Kibana, ngnix, and Elasticsearch.
+- type: http
+  ports: [80, 5601, 9200]
+  send_headers: true
+  send_all_headers: true
+  split_cookie: true
+  send_request: false
+  send_response: false
+  transaction_timeout: 10s
+
+- type: mysql
+  ports: [3306]
+
+xpack.monitoring.enabled: false
+
+output.logstash:
+  hosts: ["logstash:5000"]
+
+logging.to_files: false
+
+setup:
+  kibana.host: "kibana:5601"
+  dashboards.enabled: true

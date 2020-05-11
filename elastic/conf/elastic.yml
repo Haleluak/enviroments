@@ -1,0 +1,16 @@
+path:
+  data: /usr/share/elasticsearch/data
+  logs: /usr/share/elasticsearch/logs
+
+node:
+  name: ${HOSTNAME}
+
+cluster:
+  name: local-dev
+
+bootstrap:
+  memory_lock: true
+
+xpack:
+  monitoring:
+    enabled: false

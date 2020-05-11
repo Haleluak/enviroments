@@ -1,0 +1,51 @@
+version: '2'
+services:
+  nginx:
+    image: nginx:latest
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./html:/var/www/html
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./nginx/logs:/var/log/nginx
+    links:
+      - php7
+    networks:
+      - customize
+
+  php7:
+    build:
+      context: ./php7
+    volumes:
+      - ./html:/var/www/html
+      - ./php7/supervisor/conf.d:/etc/supervisor/conf.d
+      - ./php7/supervisor/logs:/var/log/supervisor
+    ports:
+      - "9001:9001"
+      - "8081:8081"
+    environment:
+      - XDEBUG_CONFIG=remote_host=172.17.0.1
+    depends_on:
+      - redis
+    working_dir: /var/www/html
+    networks:
+      - customize
+
+  redis:
+    image: redis:latest
+    volumes:
+    - ./redis/data:/data
+    ports:
+    - "6379:6379"
+    networks:
+    - customize
+networks:
+  customize:
+    driver: bridge
+    driver_opts:
+      com.docker.network.enable_ipv4: "true"
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.0.0.0/8

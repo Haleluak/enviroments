@@ -1,0 +1,17 @@
+- module: system
+  metricsets:
+  - cpu
+  - load
+  - filesystem
+  - fsstat
+  - memory
+  - network
+  - process
+  - core
+  - diskio
+  - socket
+  period: 10s
+  enabled: true
+  processes: ['.*']
+  cpu.metrics:  ["percentages"]
+  core.metrics: ["percentages"]

@@ -1,0 +1,202 @@
+version: "3"
+
+services:
+  nginx:
+    image: nginx:latest
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./html:/var/www/html
+      - ./nginx/conf.d:/etc/nginx/conf.d
+      - ./nginx/logs:/var/log/nginx
+    links:
+      - php7
+    networks:
+      - customize
+
+  php7:
+    build:
+      context: ./php7
+    image: khanhnv/php7:latest
+    volumes:
+      - ./html:/var/www/html
+      - ./php7/supervisor/conf.d:/etc/supervisor/conf.d
+      - ./php7/supervisor/logs:/var/log/supervisor
+    ports:
+      - "9001:9001"
+      - "8080:8080"
+    depends_on:
+      - mariadb
+      - redis
+      - elastic
+      - rabbitmq
+    extra_hosts:
+      - "mail.tuoitre.com.vn:192.168.161.170"
+    working_dir: /var/www/html
+    networks:
+      - customize
+
+  mariadb:
+    image: mariadb:latest
+    volumes:
+      - /hdd/data/mariadb:/var/lib/mysql
+      - ./mariadb/conf/my.cnf:/etc/mysql/my.cnf
+      - ./mariadb/logs/mysql:/var/log/mysql
+    ports:
+      - "3306:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: oVXEkVi9FTgYdhif
+    networks:
+      - customize
+
+  redis:
+    image: redis:latest
+    volumes:
+      - ./redis/data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - customize
+
+  rabbitmq:
+    image: rabbitmq:3-management
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+    - "15672:15672"
+    - "5672:5672"
+    networks:
+    - customize
+
+  elastic:
+    image: docker.elastic.co/elasticsearch/elasticsearch:5.6.5
+    build:
+      context: elastic/
+    volumes:
+      - ./elastic/conf/elastic.yml:/usr/share/elasticsearch/elasticsearch.yml
+      - ./elastic/data:/usr/share/elasticsearch/data
+      - ./elastic/logs:/usr/share/elasticsearch/logs
+    environment:
+      LS_JAVA_OPTS: "-Xmx256m -Xms256m"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    ports:
+      - "9200:9200"
+    networks:
+      - customize
+
+  kibana:
+    image: kibana:5.6.0
+    volumes:
+      - ./kibana/config/:/usr/share/kibana/config
+    ports:
+      - "5601:5601"
+    environment:
+      - XPACK_GRAPH_ENABLED=false
+      - XPACK_MONITORING_ENABLED=false
+      - XPACK_REPORTING_ENABLED=false
+      - XPACK_SECURITY_ENABLED=false
+    networks:
+      - customize
+    depends_on:
+      - elastic
+
+  logstash:
+    image: docker.elastic.co/logstash/logstash:5.5.3
+    build:
+      context: logstash/
+    volumes:
+      - ./logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
+      - ./logstash/pipeline:/usr/share/logstash/pipeline:ro
+    ports:
+      - "5000:5000"
+    environment:
+      LS_JAVA_OPTS: "-Xmx256m -Xms256m"
+    networks:
+      - customize
+    depends_on:
+      - elastic
+
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:5.6.5
+    hostname: filebeat
+    user: root
+    volumes:
+    #Mount the Filebeat configuration so users can make edits.
+      - ./beats/filebeat/filebeat.yml:/usr/share/filebeat/filebeat.yml
+    #Mount the prospectors directory. Users can in turn add propspectors to this directory and they will be dynamically loaded.
+      - ./beats/filebeat/prospectors.d/:/usr/share/filebeat/prospectors.d/
+    #Mount the nginx logs into the Filebeat container so we can access and index them using the Filebeat nginx module.
+      - ./nginx/logs:/var/log/nginx
+    #Mount the MySQL logs into the Filebeat container so we can access and and index them using the Filebeat MySQL module.
+      - ./mariadb/logs:/var/log/mysql
+    #Mount the hosts system log directory. This represents the logs of the VM hosting docker. Consumed by the Filebeat system module.
+      - /private/var/log/:/var/log/host/:ro
+    #Mount the Docker logs for indexing by the custom prospector ./config/filebeat/prospectors.d.
+      - /var/lib/docker/containers:/var/lib/docker/containers
+    #Named volume fsdata. This is used to persist the registry file between restarts, so to avoid data duplication.
+      - ./beats/filebeat/data:/usr/share/filebeat/data/
+    #Allows us to report on docker from the hosts information.
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: filebeat -e -strict.perms=false
+    networks:
+      - customize
+    depends_on:
+      - logstash
+
+  metricbeat:
+    image: docker.elastic.co/beats/metricbeat:5.6.5
+    hostname: metricbeat
+    user: root
+    volumes:
+      #Mount the metricbeat configuration so users can make edits.
+      - ./beats/metricbeat/metricbeat.yml:/usr/share/metricbeat/metricbeat.yml
+      #Mount the modules.d directory into the container. This allows user to potentially make changes to the modules and they will be dynamically loaded.
+      - ./beats/metricbeat/modules.d/:/usr/share/metricbeat/modules.d/
+      #The commented sections below enable Metricbeat to monitor the Docker host rather than the Metricbeat container. These are used by the system module.
+      - /proc:/hostfs/proc:ro
+      - /sys/fs/cgroup:/hostfs/sys/fs/cgroup:ro
+      #Allows us to report on docker from the hosts information.
+      - /var/run/docker.sock:/var/run/docker.sock
+      #We mount the host filesystem so we can report on disk usage with the system module.
+      - /:/hostfs:ro
+    command: metricbeat -e -system.hostfs=/hostfs -strict.perms=false
+    networks:
+      - customize
+    environment:
+      MYSQL_ROOT_PASSWORD: oVXEkVi9FTgYdhif
+    depends_on:
+      - logstash
+
+  packetbeat:
+    image: docker.elastic.co/beats/packetbeat:5.6.5
+    hostname: packetbeat
+    user: root
+    volumes:
+      #Mount the packetbeat configuration so users can make edits.
+      - ./beats/packetbeat/packetbeat.yml:/usr/share/packetbeat/packetbeat.yml
+      #Allows us to report on docker from the hosts information.
+      - /var/run/docker.sock:/var/run/docker.sock
+      # Packetbeat needs some elevated privileges to capture network traffic. We'll grant them with POSIX capabilities.
+    cap_add: ["NET_RAW", "NET_ADMIN"]
+      # Use "host mode" networking to allow Packetbeat to capture traffic from the real network interface on the host,
+      # rather than being isolated to the container's virtual interface.
+    networks:
+    - customize
+    command: packetbeat -e -strict.perms=false
+    depends_on:
+      - logstash
+
+networks:
+  customize:
+    driver: bridge
+    driver_opts:
+      com.docker.network.enable_ipv4: "true"
+    ipam:
+      driver: default
+      config:
+        - subnet: 10.0.0.0/8
